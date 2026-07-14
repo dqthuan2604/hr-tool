@@ -136,7 +136,7 @@ Quy trình xử lý hồ sơ ứng viên hiện tại gặp các vấn đề sau
 | NFB-01 | **Tốc độ xử lý** | Một hồ sơ ứng viên phải được hệ thống xử lý và trả kết quả trong vòng 60 giây |
 | NFB-02 | **Độ chính xác trích xuất** | Thông tin liên hệ cơ bản (email, số điện thoại) phải được trích xuất đúng ít nhất 90% trường hợp |
 | NFB-03 | **Tính sẵn sàng** | Hệ thống phải hoạt động ổn định trong giờ hành chính (8:00–18:00) |
-| NFB-04 | **Bảo mật dữ liệu** | Dữ liệu ứng viên phải được lưu trữ nội bộ trong hệ thống của doanh nghiệp, không gửi ra ngoài bên thứ ba |
+| NFB-04 | **Bảo mật dữ liệu** | Dữ liệu ứng viên và file tải lên phải được lưu trữ nội bộ qua MinIO trong hệ thống của doanh nghiệp, không gửi ra ngoài bên thứ ba |
 | NFB-05 | **Dễ sử dụng** | Người dùng mới không cần đào tạo chuyên sâu vẫn có thể sử dụng thành thạo sau 30 phút làm quen |
 | NFB-06 | **Định dạng đầu vào** | Hệ thống phải hỗ trợ đọc file **PDF có text layer** (copyable PDF). PDF dạng scan hình ảnh không được hỗ trợ trong MVP |
 | NFB-07 | **Lịch sử phiên bản** | Mỗi lần lưu chỉnh sửa hồ sơ phải tạo ra một phiên bản mới — không được ghi đè phiên bản cũ |
@@ -186,3 +186,9 @@ MVP được coi là thành công khi đáp ứng đầy đủ các tiêu chí s
 ---
 
 *Tài liệu này sẽ được xem xét và cập nhật sau mỗi Sprint hoặc khi có thay đổi yêu cầu từ stakeholders.*
+
+---
+
+## 11. Lịch sử cập nhật (Audit Log)
+
+- **14/07/2026**: Cập nhật hệ thống lưu trữ sang MinIO (On-Premise Object Storage) thay vì lưu trữ tại thư mục local theo yêu cầu. Thực hiện audit/check lại toàn bộ file 14/07/2026.

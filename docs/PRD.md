@@ -35,16 +35,17 @@ Hệ thống được xây dựng theo mô hình **Monorepo** với 3 lớp chí
 └──────────┬─────────────────┬──────────────┘
            │                 │
 ┌──────────▼──────┐   ┌──────▼──────────────┐
-│  PostgreSQL DB  │   │  AI Engine (Ollama)  │
-│  Lưu trữ dữ liệu│   │  on-premise, local  │
+│ PostgreSQL/MinIO│   │  AI Engine (Ollama)  │
+│ Lưu trữ dữ liệu │   │  on-premise, local  │
 └─────────────────┘   └─────────────────────┘
 ```
 
 **Công nghệ cốt lõi:**
-- **Backend:** Python / FastAPI — phục vụ REST API, xử lý tài liệu
-- **Frontend:** React (Vite) + TailwindCSS — giao diện web
-- **Cơ sở dữ liệu:** PostgreSQL — lưu templates, candidates, drafts
-- **AI Hỗ trợ:** Ollama (local) với model `qwen2.5:1.5b` — fallback khi trích xuất heuristic thất bại
+- **Backend:** Python (FastAPI).
+- **Frontend:** SPA bằng React (Vite).
+- **Cơ sở dữ liệu:** PostgreSQL để lưu meta-data; **MinIO (S3-compatible)** để lưu trữ file tài liệu PDF, DOCX, Hình ảnh (thay vì thư mục local).
+- **Local AI:** Sử dụng Ollama (model Qwen2.5) để làm LLM chạy trên máy chủ nội bộ.
+- **Renderer:** WeasyPrint / python-docx.
 - **Xử lý tài liệu:** `pdfplumber` (PDF), `python-docx` (DOCX)
 - **Xuất file:** `WeasyPrint` (PDF), `python-docx` (DOCX)
 - **Triển khai:** Docker Compose
@@ -308,7 +309,7 @@ FE: axios { responseType: 'blob' } → URL.createObjectURL() → trigger downloa
 | FR-F01 | Hỗ trợ upload file **PDF có text layer** (copyable PDF) | Must-have |
 | FR-F02 | Giới hạn kích thước file: tối đa 10MB | Must-have |
 | FR-F03 | Validate MIME type khi nhận file phía server | Must-have |
-| FR-F04 | Lưu file gốc vào thư mục upload nội bộ | Must-have |
+| FR-F04 | Lưu file gốc vào hệ thống lưu trữ **MinIO** (thay vì thư mục upload nội bộ) | Must-have |
 | FR-F05 | Phát hiện và từ chối PDF dạng scan hình ảnh — hiển thị thông báo lỗi rõ ràng | Must-have |
 | FR-F06 | Hỗ trợ upload thêm file `.docx` | Should-have |
 
@@ -471,3 +472,9 @@ Mỗi khi người dùng lưu chỉnh sửa, một bản ghi `CandidateVersion` 
 ---
 
 *Tài liệu PRD này là cầu nối giữa yêu cầu nghiệp vụ (BRD) và kế hoạch triển khai kỹ thuật chi tiết. Mọi thay đổi nghiệp vụ cần được phản ánh đồng thời vào cả BRD, PRD và Implementation Plan.*
+
+---
+
+## 11. Lịch sử cập nhật (Audit Log)
+
+- **14/07/2026**: Cập nhật FR-F04 và Kiến trúc tổng quan: Bổ sung MinIO làm hệ thống lưu trữ object storage thay cho thư mục local theo yêu cầu của BRD. Thực hiện audit/check lại toàn bộ file 14/07/2026.
