@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV - {{ profile.basic_info.full_name | default('') }}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: {{ colors.primary | default('#1a1a2e') }};
+    --accent: {{ colors.accent | default('#4361ee') }};
+    --bg: {{ colors.background | default('#ffffff') }};
+    --text: {{ colors.text | default('#333333') }};
+    --font-heading: {{ fonts.heading.family | default('Inter') }}, Arial, sans-serif;
+    --font-body: {{ fonts.body.family | default('Inter') }}, Arial, sans-serif;
+    --font-size-body: {{ fonts.body.size | default(11) }}pt;
+    --font-size-heading: {{ fonts.heading.size | default(14) }}pt;
+  }
+
+  body {
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+
+  .cv-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--bg);
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  .cv-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 36px 48px 28px;
+  }
+  .cv-header h1 {
+    font-size: 28pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .cv-header .contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    font-size: 10pt;
+    opacity: 0.88;
+    margin-top: 8px;
+  }
+  .cv-header .contact-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .cv-header .contact-item a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* ─── BODY LAYOUT ─── */
+  {% if columns_count >= 2 %}
+  .cv-body {
+    display: grid;
+    grid-template-columns: {{ layout.columns | join(' ') }};
+    min-height: calc(100vh - 140px);
+  }
+  .col-left {
+    background: color-mix(in srgb, var(--primary) 7%, white);
+    padding: 28px 24px;
+    border-right: 1px solid rgba(0,0,0,0.06);
+  }
+  .col-right {
+    padding: 28px 40px;
+  }
+  {% else %}
+  .cv-body { padding: 32px 48px; }
+  {% endif %}
+
+  /* ─── SECTION ─── */
+  .section { margin-bottom: 28px; }
+  .section-title {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 5px;
+    margin-bottom: 14px;
+  }
+
+  /* ─── BASIC INFO ─── */
+  .summary-text {
+    font-size: 10.5pt;
+    line-height: 1.7;
+    color: #555;
+  }
+
+  /* ─── EXPERIENCE / EDUCATION ─── */
+  .exp-item, .edu-item, .proj-item { margin-bottom: 16px; }
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .exp-role {
+    font-weight: 600;
+    font-size: 11pt;
+    color: var(--primary);
+  }
+  .exp-company {
+    font-weight: 500;
+    color: var(--accent);
+    font-size: 10.5pt;
+  }
+  .exp-dates {
+    font-size: 9.5pt;
+    color: #888;
+    white-space: nowrap;
+  }
+  .exp-desc {
+    margin-top: 6px;
+    font-size: 10pt;
+    color: #555;
+    line-height: 1.6;
+  }
+  .edu-degree {
+    font-weight: 600;
+    font-size: 11pt;
+    color: var(--primary);
+  }
+  .edu-school {
+    color: var(--accent);
+    font-size: 10.5pt;
+  }
+  .edu-meta {
+    font-size: 9.5pt;
+    color: #888;
+    margin-top: 2px;
+  }
+
+  /* ─── SKILLS ─── */
+  .skill-group { margin-bottom: 10px; }
+  .skill-category {
+    font-weight: 600;
+    font-size: 9.5pt;
+    color: var(--primary);
+    margin-bottom: 5px;
+  }
+  .skill-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .skill-tag {
+    background: color-mix(in srgb, var(--accent) 12%, white);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, white);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 9pt;
+    font-weight: 500;
+  }
+
+  /* ─── CERT / LANG ─── */
+  .cert-item, .lang-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 10pt;
+  }
+  .lang-level {
+    font-size: 9pt;
+    color: #888;
+  }
+
+  /* ─── PROJECTS ─── */
+  .proj-name {
+    font-weight: 600;
+    font-size: 11pt;
+    color: var(--primary);
+  }
+  .proj-tech { font-size: 9pt; color: #888; margin-top: 3px; }
+  .proj-desc { font-size: 10pt; color: #555; margin-top: 5px; line-height: 1.6; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  {# ─── HEADER ─── #}
+  <header class="cv-header">
+    <h1>{{ profile.basic_info.full_name | default('') }}</h1>
+    <div class="contact-row">
+      {% if profile.basic_info.email %}
+      <span class="contact-item">✉ <a href="mailto:{{ profile.basic_info.email }}">{{ profile.basic_info.email }}</a></span>
+      {% endif %}
+      {% if profile.basic_info.phone %}
+      <span class="contact-item">📞 {{ profile.basic_info.phone }}</span>
+      {% endif %}
+      {% if profile.basic_info.address %}
+      <span class="contact-item">📍 {{ profile.basic_info.address }}</span>
+      {% endif %}
+      {% if profile.basic_info.linkedin %}
+      <span class="contact-item">🔗 <a href="{{ profile.basic_info.linkedin }}" target="_blank">LinkedIn</a></span>
+      {% endif %}
+      {% if profile.basic_info.website %}
+      <span class="contact-item">🌐 <a href="{{ profile.basic_info.website }}" target="_blank">Portfolio</a></span>
+      {% endif %}
+    </div>
+  </header>
+
+  {# ─── BODY ─── #}
+  {% if columns_count >= 2 %}
+  <div class="cv-body">
+    {# Left column (col 0) #}
+    <div class="col-left">
+      {% for section in sections_col.get(0, []) %}
+        {% if section.visible != false %}
+        {% set key = section.key %}
+
+        {% if key == 'basic_info' and profile.basic_info.summary %}
+        <div class="section">
+          <div class="section-title">Profile</div>
+          <p class="summary-text">{{ profile.basic_info.summary }}</p>
+        </div>
+
+        {% elif key == 'skills' and profile.skills %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Skills') }}</div>
+          {% for group in profile.skills %}
+          <div class="skill-group">
+            <div class="skill-group-title">{{ group.category }}</div>
+            <div class="skill-tags">
+              {% for item in group['items'] %}<span class="skill-tag">{{ item }}</span>{% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% elif key == 'languages' and profile.languages %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Languages') }}</div>
+          {% for lang in profile.languages %}
+          <div class="lang-item">
+            <span>{{ lang.language }}</span>
+            <span class="lang-level">{{ lang.level }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% elif key == 'certifications' and profile.certifications %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Certifications') }}</div>
+          {% for cert in profile.certifications %}
+          <div class="cert-item">
+            <span>{{ cert.name }}</span>
+            <span class="lang-level">{{ cert.date }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {# Right column (col 1) #}
+    <div class="col-right">
+      {% for section in sections_col.get(1, []) %}
+        {% if section.visible != false %}
+        {% set key = section.key %}
+
+        {% if key == 'work_experiences' and profile.work_experiences %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Experience') }}</div>
+          {% for exp in profile.work_experiences %}
+          <div class="exp-item">
+            <div class="exp-header">
+              <div>
+                <div class="exp-role">{{ exp.role }}</div>
+                <div class="exp-company">{{ exp.company }}</div>
+              </div>
+              <div class="exp-dates">{{ exp.start_date }} – {{ exp.end_date | default('Present') }}</div>
+            </div>
+            {% if exp.description %}<div class="exp-desc">{{ exp.description }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        {% elif key == 'educations' and profile.educations %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Education') }}</div>
+          {% for edu in profile.educations %}
+          <div class="edu-item">
+            <div class="edu-degree">{{ edu.degree }}</div>
+            <div class="edu-school">{{ edu.school }}</div>
+            <div class="edu-meta">
+              {% if edu.major %}{{ edu.major }}{% endif %}
+              {% if edu.gpa %} · GPA: {{ edu.gpa }}{% endif %}
+              {% if edu.start_date %} · {{ edu.start_date }} – {{ edu.end_date | default('') }}{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% elif key == 'projects' and profile.projects %}
+        <div class="section">
+          <div class="section-title">{{ section.label | default('Projects') }}</div>
+          {% for proj in profile.projects %}
+          <div class="proj-item">
+            <div class="proj-name">{{ proj.name }}</div>
+            {% if proj.tech_stack %}<div class="proj-tech">{{ proj.tech_stack | join(', ') }}</div>{% endif %}
+            {% if proj.description %}<div class="proj-desc">{{ proj.description }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {% else %}
+  {# Single column layout #}
+  <div class="cv-body">
+    {% if profile.basic_info.summary %}
+    <div class="section">
+      <div class="section-title">Profile</div>
+      <p class="summary-text">{{ profile.basic_info.summary }}</p>
+    </div>
+    {% endif %}
+
+    {% if profile.work_experiences %}
+    <div class="section">
+      <div class="section-title">Experience</div>
+      {% for exp in profile.work_experiences %}
+      <div class="exp-item">
+        <div class="exp-header">
+          <div>
+            <div class="exp-role">{{ exp.role }}</div>
+            <div class="exp-company">{{ exp.company }}</div>
+          </div>
+          <div class="exp-dates">{{ exp.start_date }} – {{ exp.end_date | default('Present') }}</div>
+        </div>
+        {% if exp.description %}<div class="exp-desc">{{ exp.description }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.educations %}
+    <div class="section">
+      <div class="section-title">Education</div>
+      {% for edu in profile.educations %}
+      <div class="edu-item">
+        <div class="edu-degree">{{ edu.degree }}</div>
+        <div class="edu-school">{{ edu.school }}</div>
+        <div class="edu-meta">
+          {% if edu.major %}{{ edu.major }}{% endif %}
+          {% if edu.gpa %} · GPA: {{ edu.gpa }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.skills %}
+    <div class="section">
+      <div class="section-title">Skills</div>
+      {% for group in profile.skills %}
+      <div class="skill-group">
+        {% if group.category %}<div class="skill-category">{{ group.category }}</div>{% endif %}
+        <div class="skill-tags">
+          {% for item in group['items'] %}<span class="skill-tag">{{ item }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.projects %}
+    <div class="section">
+      <div class="section-title">Projects</div>
+      {% for proj in profile.projects %}
+      <div class="proj-item">
+        <div class="proj-name">{{ proj.name }}</div>
+        {% if proj.tech_stack %}<div class="proj-tech">{{ proj.tech_stack | join(', ') }}</div>{% endif %}
+        {% if proj.description %}<div class="proj-desc">{{ proj.description }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.certifications %}
+    <div class="section">
+      <div class="section-title">Certifications</div>
+      {% for cert in profile.certifications %}
+      <div class="cert-item">
+        <span>{{ cert.name }}{% if cert.issuer %} — {{ cert.issuer }}{% endif %}</span>
+        <span class="lang-level">{{ cert.date }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.languages %}
+    <div class="section">
+      <div class="section-title">Languages</div>
+      {% for lang in profile.languages %}
+      <div class="lang-item">
+        <span>{{ lang.language }}</span>
+        <span class="lang-level">{{ lang.level }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>

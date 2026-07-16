@@ -34,16 +34,17 @@ Hệ thống được xây dựng theo mô hình **Monorepo** với 3 lớp chí
 │  Xử lý nghiệp vụ, trích xuất, render CV   │
 └──────────┬─────────────────┬──────────────┘
            │                 │
-┌──────────▼──────┐   ┌──────▼──────────────┐
-│ PostgreSQL/MinIO│   │  AI Engine (Ollama)  │
-│ Lưu trữ dữ liệu │   │  on-premise, local  │
-└─────────────────┘   └─────────────────────┘
+┌──────────▼──────┐   ┌──────▼──────────────┐   ┌─────────▼───────────┐
+│ PostgreSQL/MinIO│   │  AI Engine (Ollama)  │   │  Redis & Celery      │
+│ Lưu trữ dữ liệu │   │  on-premise, local  │   │  Worker & Message Q  │
+└─────────────────┘   └─────────────────────┘   └─────────────────────┘
 ```
 
 **Công nghệ cốt lõi:**
 - **Backend:** Python (FastAPI).
+- **Background Worker:** Celery + Redis (xử lý LLM và file nặng).
 - **Frontend:** SPA bằng React (Vite).
-- **Cơ sở dữ liệu:** PostgreSQL để lưu meta-data; **MinIO (S3-compatible)** để lưu trữ file tài liệu PDF, DOCX, Hình ảnh (thay vì thư mục local).
+- **Cơ sở dữ liệu:** PostgreSQL để lưu meta-data; **MinIO (S3-compatible)** để lưu trữ file tài liệu.
 - **Local AI:** Sử dụng Ollama (model Qwen2.5) để làm LLM chạy trên máy chủ nội bộ.
 - **Renderer:** WeasyPrint / python-docx.
 - **Xử lý tài liệu:** `pdfplumber` (PDF), `python-docx` (DOCX)
@@ -78,16 +79,18 @@ Hệ thống được xây dựng theo mô hình **Monorepo** với 3 lớp chí
 - [ ] **Bắt buộc** chấp nhận file `.pdf` (có text layer). Các định dạng khác hiển thị thông báo lỗi.
 - [ ] **Should-have:** Chấp nhận thêm định dạng `.docx`.
 - [ ] Giới hạn kích thước file tối đa: 10MB. File lớn hơn hiển thị thông báo lỗi.
-- [ ] Hiển thị trạng thái "Đang xử lý..." trong khi hệ thống phân tích file.
+- [ ] Hiển thị trạng thái "Đang xử lý..." (Loading overlay) thay đổi nội dung real-time theo tiến độ (dùng SSE) trong khi hệ thống phân tích file.
 - [ ] Sau khi xử lý thành công, template mới xuất hiện trong danh sách.
 - [ ] Nếu file PDF là dạng scan (không có text layer), hiển thị thông báo lỗi rõ ràng hướng dẫn người dùng tải lại file đúng định dạng.
 - [ ] Nếu xử lý thất bại vì lý do khác, hiển thị thông báo lỗi rõ ràng (không hiển thị lỗi kỹ thuật nội bộ).
 
 **Luồng kỹ thuật:**
 ```
-[Upload File] → save_upload() → parse_file() → extract_template_schema()
-     → [Nếu detect < 2 sections] → llm_fallback.detect_sections_with_llm()
-     → Lưu Template vào DB → Trả về TemplateResponse
+[Upload File] → Đẩy Job vào Redis Queue → Trả về { job_id }
+[SSE Connection] ← Lắng nghe trạng thái từ GET /api/templates/upload/{job_id}/stream
+[Celery Worker] → parse_file() → extract_template_schema() (grid clustering)
+               → [Nếu detect < 2 sections] → llm_fallback.detect_sections_with_llm()
+               → Lưu Template vào DB → Báo Done qua SSE
 ```
 
 ---
@@ -387,7 +390,7 @@ FE: axios { responseType: 'blob' } → URL.createObjectURL() → trigger downloa
 
 ### 7.1. Template Schema (schema_json)
 Thông tin được trích xuất từ mẫu CV và lưu lại, bao gồm:
-- **Layout:** Loại bố cục (1 cột / 2 cột)
+- **Layout:** Cấu trúc dạng lưới (Grid), lưu tỷ lệ tương đối của các cột (VD: `columns: ["30%", "70%"]`).
 - **Colors:** Bộ màu chính (primary, accent, background, text)
 - **Fonts:** Thông tin font heading và body (family, size, weight)
 - **Sections:** Danh sách các phần theo thứ tự (key, tên hiển thị, thứ tự, hiển thị hay không)
@@ -417,7 +420,8 @@ Mỗi khi người dùng lưu chỉnh sửa, một bản ghi `CandidateVersion` 
 
 | Method | Endpoint | Mô tả | Mức độ |
 |---|---|---|---|
-| POST | `/api/templates/upload` | Tải lên và phân tích mẫu CV | Must |
+| POST | `/api/templates/upload` | Tải lên mẫu CV, trả về job_id | Must |
+| GET | `/api/templates/upload/{job_id}/stream` | Stream trạng thái xử lý (SSE) | Must |
 | GET | `/api/templates` | Danh sách mẫu | Must |
 | GET | `/api/templates/{id}` | Chi tiết một mẫu | Must |
 | DELETE | `/api/templates/{id}` | Xóa mẫu | Must |

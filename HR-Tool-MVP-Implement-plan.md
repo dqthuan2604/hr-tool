@@ -7,8 +7,8 @@
 | Project | HR Tool MVP |
 | Repo structure | Monorepo |
 | Auth | None (skip for MVP) |
-| Database | PostgreSQL |
-| Backend | Python — FastAPI + SQLAlchemy + Alembic |
+| Database | PostgreSQL + Redis (Queue & Pub/Sub) |
+| Backend | Python — FastAPI + Celery + SQLAlchemy + Alembic |
 | Frontend | React (Vite) + TailwindCSS |
 | CV Export | WeasyPrint (PDF), python-docx (DOCX) |
 | LLM Fallback | Ollama local — Qwen2.5:1.5b |
@@ -169,7 +169,10 @@ CREATE TABLE cv_drafts (
 
 ```json
 {
-  "layout": "single-column",
+  "layout": {
+    "type": "grid",
+    "columns": ["30%", "70%"]
+  },
   "colors": {
     "primary": "#2D3748",
     "accent": "#3182CE",
@@ -185,6 +188,7 @@ CREATE TABLE cv_drafts (
       "key": "basic_info",
       "label": "Header",
       "order": 1,
+      "column": 0,
       "visible": true,
       "style": {}
     },
@@ -192,6 +196,7 @@ CREATE TABLE cv_drafts (
       "key": "work_experiences",
       "label": "Kinh nghiệm làm việc",
       "order": 2,
+      "column": 1,
       "visible": true,
       "style": {}
     }
@@ -205,7 +210,8 @@ CREATE TABLE cv_drafts (
 
 ```
 # Templates
-POST   /api/templates/upload        -- upload file → extract template
+POST   /api/templates/upload        -- upload file → trigger Celery Job → return { job_id }
+GET    /api/templates/upload/{job_id}/stream -- SSE nhận progress real-time
 GET    /api/templates               -- list all templates
 GET    /api/templates/{id}          -- get template detail
 DELETE /api/templates/{id}
@@ -261,6 +267,9 @@ PUT    /api/generator/drafts/{id}   -- update custom_json
   phonenumbers==8.13.37
   httpx==0.27.0
   python-dotenv==1.0.1
+  celery==5.4.0
+  redis==5.0.4
+  sse-starlette==2.1.0
   ```
 - Tạo `backend/app/main.py`:
   - FastAPI app instance
@@ -338,27 +347,57 @@ PUT    /api/generator/drafts/{id}   -- update custom_json
         - "5432:5432"
       volumes:
         - pgdata:/var/lib/postgresql/data
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
 
-    backend:
-      build: ./backend
-      ports:
-        - "8000:8000"
-      depends_on:
-        - postgres
-      env_file:
-        - ./backend/.env
-      volumes:
-        - ./backend:/app
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - minio
+      - redis
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
 
-    frontend:
-      build: ./frontend
-      ports:
-        - "5173:5173"
-      volumes:
-        - ./frontend:/app
+  worker:
+    build: ./backend
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - postgres
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
 
-  volumes:
-    pgdata:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+
+volumes:
+  pgdata:
+  minio_data:
   ```
 - Tạo `backend/Dockerfile` và `frontend/Dockerfile`
 
@@ -382,7 +421,7 @@ PUT    /api/generator/drafts/{id}   -- update custom_json
 - Tạo `backend/app/services/template_extractor.py`:
   - Function `extract_template_schema(parsed: dict) -> dict`:
     - **Heuristic 1 — Section headers:** char `size > median_size * 1.3` VÀ (`bold == True` OR `color != body_color`) → đây là header
-    - **Heuristic 2 — Layout detection:** kiểm tra `x0` của text blocks, nếu có 2 cụm x rõ ràng → `two-column`, không thì `single-column`
+    - **Heuristic 2 — Layout detection (Clustering):** Gom nhóm text blocks theo toạ độ `x0`. Phân cụm (cluster) trục X để tìm ra layout có mấy cột. Tính khoảng cách để suy ra tỉ lệ tương đối (VD: `["30%", "70%"]`). Ghi nhận từng text block thuộc cột nào (`column: 0` hay `1`).
     - **Heuristic 3 — Color extraction:** lấy 3 màu xuất hiện nhiều nhất từ `chars`
     - **Heuristic 4 — Font info:** group chars theo `fontname`, lấy `size` phổ biến nhất làm body font
     - Map các header text sang section keys chuẩn: `["kinh nghiệm", "work experience"] → "work_experiences"`, tương tự cho các section khác
@@ -403,10 +442,11 @@ PUT    /api/generator/drafts/{id}   -- update custom_json
 #### Task 1.4 — Template router
 - Tạo `backend/app/routers/templates.py`:
   - `POST /api/templates/upload`:
-    - Nhận `UploadFile`
-    - Gọi `save_upload()` → `parse_file()` → `extract_template_schema()`
-    - Nếu sections < 2: gọi LLM fallback
-    - Lưu vào DB, return `TemplateResponse`
+    - Nhận `UploadFile`, lưu file vào ổ đĩa.
+    - Đẩy task vào Celery Queue, return `{"job_id": "UUID"}`
+  - `GET /api/templates/upload/{job_id}/stream`:
+    - Endpoint chuẩn SSE (Server-Sent Events) dùng `sse-starlette`.
+    - Lắng nghe message pub/sub từ Redis hoặc check Celery state để bắn status: "parsing", "extracting", "llm_fallback", "done".
   - `GET /api/templates`: return list
   - `GET /api/templates/{id}`: return detail
   - `DELETE /api/templates/{id}`: xóa DB record + file
@@ -421,8 +461,9 @@ PUT    /api/generator/drafts/{id}   -- update custom_json
 - Tạo `frontend/src/components/FileUpload.jsx`:
   - Drag-and-drop + click to upload
   - Accept: `.pdf, .docx`
-  - Hiển thị loading spinner khi đang upload
-  - Hiển thị error message nếu upload fail
+  - Khi có `job_id`, kết nối `EventSource` tới endpoint `/stream`
+  - Hiển thị overlay Loading với message thay đổi real-time từ SSE (Ví dụ: "Đang phân tích layout...")
+  - Hiển thị error message nếu upload hoặc process fail
 - Tạo `frontend/src/components/TemplateCard.jsx`:
   - Hiển thị: tên template, số sections, preview thumbnail (nếu có), nút Delete
 - Cập nhật `frontend/src/pages/TemplatePage.jsx`:

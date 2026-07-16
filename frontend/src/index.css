@@ -1,0 +1,241 @@
+/* ═══════════════════════════════════════════════════
+   HR Tool — Dark Design System
+   Palette: OLED Black + Electric Indigo
+   Font: Geist (Google Fonts CDN)
+═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ─────────────────────────────── */
+:root {
+  /* Backgrounds (Zinc) */
+  --bg-base:        #09090b;
+  --bg-surface:     #18181b;
+  --bg-elevated:    #27272a;
+  --bg-overlay:     #27272a;
+  --bg-raised:      #3f3f46;
+
+  /* Accent — Minimalist Indigo */
+  --accent:         #818cf8;
+  --accent-hover:   #a5b4fc;
+  --accent-muted:   rgba(129, 140, 248, 0.15);
+  --accent-glow:    rgba(129, 140, 248, 0.25);
+
+  /* Text */
+  --text-primary:   #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted:     #71717a;
+  --text-disabled:  #52525b;
+
+  /* Borders */
+  --border:         rgba(255, 255, 255, 0.12);
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-accent:  rgba(129, 140, 248, 0.4);
+
+  /* Shadows (Softer) */
+  --shadow-sm:      0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-card:    0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-modal:   0 24px 48px rgba(0, 0, 0, 0.6);
+  --shadow-glow:    0 0 15px rgba(129, 140, 248, 0.15);
+
+  /* Radius */
+  --radius-sm:      6px;
+  --radius-md:      10px;
+  --radius-lg:      14px;
+  --radius-xl:      20px;
+
+  /* Font */
+  --font-sans:      'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:      'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Base Reset ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* ─── Scrollbar ──────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Component Utilities ────────────────────────── */
+.glass-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: all 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.glass-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+.dark-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  font-family: var(--font-sans);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.dark-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.dark-input option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* ─── Keyframe Animations ────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(calc(100% + 1.5rem));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 1.5rem));
+    opacity: 0;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--accent-muted),
+                0 0 10px var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--accent-muted),
+                0 0 28px rgba(99, 102, 241, 0.35);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+/* ─── Animation Classes ──────────────────────────── */
+.animate-fade-up {
+  animation: fadeUp 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Skeleton Loader ────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-elevated) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ─── Status Badges ──────────────────────────────── */
+.badge-success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.badge-warning {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.badge-info {
+  background: var(--accent-muted);
+  color: var(--accent-hover);
+  border: 1px solid var(--border-accent);
+}
