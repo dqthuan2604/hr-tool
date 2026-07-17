@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getCandidateVersions, saveCandidateVersion, restoreCandidateVersion } from '../api/candidates';
-import { X, User, Envelope, Phone, LinkedinLogo, Briefcase, Plus, GraduationCap, Code, Folder } from '@phosphor-icons/react';
+import { X, User, Envelope, Phone, LinkedinLogo, Briefcase, Plus, GraduationCap, Code, Folder, Trophy } from '@phosphor-icons/react';
 import { useToast } from './Toast';
 import ConfirmModal from './ConfirmModal';
 
@@ -89,6 +89,7 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
   const educations = profile.educations || [];
   const projects = profile.projects || [];
   const skills = profile.skills || [];
+  const awards = profile.awards || [];
 
   return (
     <div
@@ -98,7 +99,7 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
     >
       <div
-        className="w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden rounded-2xl shadow-2xl animate-fade-up"
+        className="w-full max-w-5xl h-[85vh] min-h-[600px] flex flex-col overflow-hidden rounded-2xl shadow-2xl animate-fade-up"
         style={{
           background: 'var(--bg-overlay)',
           border: '1px solid var(--border)',
@@ -168,11 +169,11 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
 
         {/* Body */}
         <div
-          className="flex-grow overflow-y-auto p-6"
+          className="flex-grow min-h-0 overflow-hidden p-0 flex flex-col"
           style={{ background: 'var(--bg-base)' }}
         >
           {activeTab === 'edit' ? (
-            <div className="flex flex-col md:flex-row h-full -m-6 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+            <div className="flex flex-col md:flex-row flex-1 min-h-0 w-full">
               {/* Sidebar */}
               <div className="w-full md:w-64 flex-shrink-0 p-4 md:p-6 space-y-1 overflow-y-auto border-r" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}>
                 {[
@@ -181,6 +182,7 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
                   { id: 'educations', label: 'Học vấn', icon: <GraduationCap size={16} /> },
                   { id: 'projects', label: 'Dự án', icon: <Folder size={16} /> },
                   { id: 'skills', label: 'Kỹ năng', icon: <Code size={16} /> },
+                  { id: 'awards', label: 'Giải thưởng', icon: <Trophy size={16} /> },
                 ].map(sec => (
                   <button
                     key={sec.id}
@@ -198,7 +200,7 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
               </div>
               
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-6 md:p-8" style={{ background: 'var(--bg-base)' }}>
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8" style={{ background: 'var(--bg-base)' }}>
                 <div className="max-w-3xl mx-auto space-y-6">
                   {activeSection === 'basic_info' && (
                     <>
@@ -643,15 +645,77 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
                 </div>
               </div>
                   </>)}
+                  {activeSection === 'awards' && (
+                    <>
+{/* Awards */}
+              <div
+                className="transition-colors"
+                
+              >
+                <div className="flex justify-between items-center mb-5 pb-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-center gap-2">
+                    <Trophy size={16} style={{ color: 'var(--accent-hover)' }} />
+                    <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Giải thưởng</h3>
+                  </div>
+                  <button
+                    onClick={() => setProfile(p => ({...p, awards: [...(p.awards || []), {name:'', organization:'', date:''}]}))}
+                    className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                    style={{ background: 'var(--accent-muted)', color: 'var(--accent-hover)' }}
+                  >
+                    <Plus size={12} weight="bold" />
+                    Thêm mục
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {awards.length === 0 ? (
+                    <p className="text-xs text-center py-4" style={{ color: 'var(--text-disabled)' }}>Không có dữ liệu giải thưởng.</p>
+                  ) : awards.map((award, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-lg relative group"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+                    >
+                      <button
+                        className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)' }}
+                        onClick={() => {
+                          const newAwards = [...awards];
+                          newAwards.splice(i, 1);
+                          setProfile({...profile, awards: newAwards});
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                      <div className="grid grid-cols-2 gap-4 pr-6">
+                        <div className="col-span-2">
+                          <label className="block text-[9px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Tên giải thưởng / Chứng chỉ</label>
+                          <input
+                            type="text" className="w-full bg-neutral-800/20 text-sm rounded-lg border border-neutral-700/40 focus:border-indigo-500/50 outline-none transition-colors px-3 py-2"
+                            value={award.name || ''}
+                            onChange={e => {
+                              const newAwards = [...awards];
+                              newAwards[i].name = e.target.value;
+                              setProfile({...profile, awards: newAwards});
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+                  </>)}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto">
-              <div
-                className="rounded-xl overflow-hidden"
-                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-              >
+            <div className="w-full h-full overflow-y-auto p-6">
+              <div className="max-w-4xl mx-auto">
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+                >
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
@@ -693,6 +757,7 @@ export default function CandidateDetailModal({ candidate, onClose, onUpdate }) {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
         </div>

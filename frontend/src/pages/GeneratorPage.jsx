@@ -18,8 +18,6 @@ export default function GeneratorPage() {
   const [previewScale, setPreviewScale] = useState(0.7);
   const [customJsonText, setCustomJsonText] = useState('{}');
   const [showJsonEditor, setShowJsonEditor] = useState(false);
-  const [customJsonText, setCustomJsonText] = useState('{}');
-  const [showJsonEditor, setShowJsonEditor] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -321,39 +319,6 @@ export default function GeneratorPage() {
         </div>
       )}
 
-      {/* Custom JSON Modal */}
-      {showJsonEditor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-full max-w-2xl flex flex-col overflow-hidden rounded-2xl shadow-2xl animate-fade-up" style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)' }}>
-            <div className="flex justify-between items-center p-5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-              <div>
-                <h2 className="text-lg font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>Tùy chỉnh Dữ liệu (JSON)</h2>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Dữ liệu này sẽ ghi đè lên dữ liệu trích xuất từ CV.</p>
-              </div>
-              <button onClick={() => setShowJsonEditor(false)} className="rounded-lg p-1.5 transition-all text-neutral-400 hover:bg-neutral-800 hover:text-white">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6">
-              <textarea
-                className="w-full bg-neutral-900 text-sm font-mono rounded-lg border border-neutral-700 focus:border-indigo-500 outline-none p-4 min-h-[300px]"
-                value={customJsonText}
-                onChange={e => setCustomJsonText(e.target.value)}
-                placeholder='{
-  "basic_info": {
-    "full_name": "Tên mới"
-  }
-}'
-                spellCheck={false}
-              />
-            </div>
-            <div className="p-5 flex justify-end gap-3" style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
-              <button onClick={() => setShowJsonEditor(false)} className="px-4 py-2 text-sm font-medium rounded-lg text-neutral-400 hover:text-white transition-colors">Đóng</button>
-              <button onClick={() => setShowJsonEditor(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">Xong</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

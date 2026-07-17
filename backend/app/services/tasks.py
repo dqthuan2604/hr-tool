@@ -45,6 +45,63 @@ def process_template(job_id: str, filename: str, file_path: str):
         # Sanitize null bytes before inserting to PostgreSQL
         schema = sanitize_null_bytes(schema)
                 
+        # Generate HTML/CSS template using AI
+        if DISABLE_LLM:
+            publish_job_progress_sync(job_id, "ai_generating", "Sử dụng template mặc định (AI bị vô hiệu hóa)...")
+            from app.services.ai_template_generator import _get_fallback_template
+            html_content = _get_fallback_template(schema)
+        else:
+            publish_job_progress_sync(job_id, "ai_generating", "Đang sử dụng AI tạo mã HTML/CSS Template...")
+            from app.services.ai_template_generator import generate_template_html
+            html_content = run_async(generate_template_html(schema))
+
+        # Generate Dummy Preview
+        from app.services.cv_renderer import render_cv_html
+        dummy_profile = {
+            "basic_info": {
+                "full_name": "Nguyễn Văn A",
+                "email": "nguyenvana@example.com",
+                "phone": "+84 123 456 789",
+                "address": "TP. Hồ Chí Minh",
+                "summary": "Mục tiêu nghề nghiệp: Trở thành một lập trình viên Fullstack giỏi, mang lại nhiều giá trị cho công ty."
+            },
+            "work_experiences": [
+                {
+                    "company": "Công ty TNHH Phần Mềm X",
+                    "role": "Frontend Developer",
+                    "start_date": "01/2022",
+                    "end_date": "Hiện tại",
+                    "description": "- Phát triển các tính năng UI/UX với ReactJS.\n- Tối ưu hóa hiệu năng trang web."
+                }
+            ],
+            "educations": [
+                {
+                    "school": "Đại học Công Nghệ Thông Tin",
+                    "degree": "Cử nhân",
+                    "major": "Kỹ thuật phần mềm",
+                    "start_date": "2018",
+                    "end_date": "2022",
+                    "gpa": "3.5/4.0"
+                }
+            ],
+            "skills": [
+                {
+                    "category": "Ngôn ngữ & Framework",
+                    "items": ["HTML/CSS", "JavaScript", "ReactJS", "NodeJS"]
+                }
+            ]
+        }
+        
+        # Render the dummy profile into the AI generated template
+        # Need to use Jinja directly here because cv_renderer might load from file
+        from jinja2 import Template as JinjaTemplate
+        try:
+            jinja_template = JinjaTemplate(html_content)
+            preview_html = jinja_template.render(profile=dummy_profile)
+        except Exception as jinja_err:
+            print("Jinja Error:", jinja_err)
+            preview_html = html_content # fallback to raw
+
         from app.database import SessionLocal
         from app.models.template import Template
         
@@ -54,7 +111,9 @@ def process_template(job_id: str, filename: str, file_path: str):
             new_template = Template(
                 name=template_name,
                 source_file=file_path,
-                schema_json=schema
+                schema_json=schema,
+                html_content=html_content,
+                preview_html=preview_html
             )
             db.add(new_template)
             db.commit()
@@ -65,7 +124,7 @@ def process_template(job_id: str, filename: str, file_path: str):
                 "name": template_name,
                 "schema": schema
             }
-            publish_job_progress_sync(job_id, "done", "Phân tích thành công!", payload)
+            publish_job_progress_sync(job_id, "done", "Phân tích và tạo Template thành công!", payload)
         finally:
             db.close()
             
@@ -73,3 +132,48 @@ def process_template(job_id: str, filename: str, file_path: str):
         # traceback.print_exc()  # User requested to remove print log for backend
         publish_job_progress_sync(job_id, "error", "Lỗi hệ thống trong quá trình phân tích file. Vui lòng thử lại sau hoặc liên hệ Admin.")
 
+
+@celery_app.task(name="app.services.tasks.process_candidate")
+def process_candidate(job_id: str, filename: str, file_path: str):
+    try:
+        publish_job_progress_sync(job_id, "parsing", "Đang đọc file tài liệu...")
+        parsed_data = parse_file(file_path)
+        
+        publish_job_progress_sync(job_id, "extracting", "Đang trích xuất thông tin ứng viên...")
+        from app.services.candidate_extractor import extract_candidate_profile
+        profile_json = extract_candidate_profile(parsed_data)
+        
+        profile_json = sanitize_null_bytes(profile_json)
+        
+        from app.database import SessionLocal
+        from app.models.candidate import Candidate, CandidateVersion
+        
+        db = SessionLocal()
+        try:
+            candidate = Candidate(
+                source_file=filename,
+                raw_text=sanitize_null_bytes(parsed_data.get("raw_text", ""))
+            )
+            db.add(candidate)
+            db.flush()
+            
+            version = CandidateVersion(
+                candidate_id=candidate.id,
+                version_number=1,
+                profile_json=profile_json,
+                is_current=True
+            )
+            db.add(version)
+            db.commit()
+            db.refresh(candidate)
+            
+            payload = {
+                "candidate_id": str(candidate.id),
+                "source_file": filename
+            }
+            publish_job_progress_sync(job_id, "done", "Trích xuất thành công!", payload)
+        finally:
+            db.close()
+            
+    except Exception as e:
+        publish_job_progress_sync(job_id, "error", f"Lỗi hệ thống trong quá trình trích xuất file: {str(e)}")

@@ -32,14 +32,21 @@ def parse_file(file_path: str) -> dict:
         
     ext = actual_path.split(".")[-1].lower()
     
-    if ext == "pdf":
-        result = _parse_pdf(actual_path)
-    elif ext == "docx":
-        result = _parse_docx(actual_path)
-    else:
-        raise ValueError(f"Unsupported file extension: {ext}")
-        
-    return _remove_nul(result)
+    try:
+        if ext == "pdf":
+            result = _parse_pdf(actual_path)
+        elif ext == "docx":
+            result = _parse_docx(actual_path)
+        else:
+            raise ValueError(f"Unsupported file extension: {ext}")
+            
+        return _remove_nul(result)
+    finally:
+        if file_path.startswith("minio://") and os.path.exists(actual_path):
+            try:
+                os.remove(actual_path)
+            except Exception:
+                pass
 
 def _remove_nul(obj):
     if isinstance(obj, str):
@@ -53,12 +60,79 @@ def _remove_nul(obj):
 
 import re
 
+def _normalize_text(text: str) -> str:
+    """Fix word-boundary issues from PDF extraction.
+    
+    Some PDFs (especially English CVs) lose spaces between words during extraction.
+    This applies conservative heuristics to restore word boundaries:
+    - 'designedAsync' → 'designed Async' (lowercase→uppercase boundary)
+    - Does NOT change Vietnamese text (diacritics protect against false splits)
+    """
+    if not text:
+        return text
+    # Split at lowercase→uppercase boundary (camelCase merge artifact)
+    text = re.sub(r'([a-z])([A-Z][a-z])', r'\1 \2', text)
+    # Multiple spaces → single space (per line to preserve newlines)
+    lines = [re.sub(r' {2,}', ' ', line) for line in text.split('\n')]
+    return '\n'.join(lines)
+
+def _reconstruct_text_from_words(page) -> str:
+    """Reconstruct text from word bounding boxes instead of character encoding.
+    
+    Why: pdfplumber's extract_text() relies on char spacing to detect word boundaries.
+    Some PDFs store no explicit space characters — spaces are implied by advance widths.
+    extract_words() uses VISUAL bounding box gaps, which is encoding-independent.
+    
+    Result: 'samplingandbuilta500MB' -> 'sampling and built a 500MB' (proper words)
+    """
+    try:
+        words = page.extract_words(x_tolerance=3, y_tolerance=3, keep_blank_chars=False)
+    except Exception:
+        return ""
+    if not words:
+        return ""
+    
+    lines = []
+    current_y = None
+    current_line = []
+    Y_THRESHOLD = 5  # pixels: tolerance for grouping chars onto same line
+    
+    for word in words:
+        word_top = word.get('top', 0)
+        if current_y is None or abs(word_top - current_y) > Y_THRESHOLD:
+            if current_line:
+                # Sort words left-to-right before joining
+                sorted_line = sorted(current_line, key=lambda w: w.get('x0', 0))
+                lines.append(' '.join(w['text'] for w in sorted_line))
+            current_line = [word]
+            current_y = word_top
+        else:
+            current_line.append(word)
+    
+    if current_line:
+        sorted_line = sorted(current_line, key=lambda w: w.get('x0', 0))
+        lines.append(' '.join(w['text'] for w in sorted_line))
+    
+    return '\n'.join(lines)
+
+
 def _extract_text_column_aware(page) -> tuple[str, str, str, float | None]:
     """
     Returns (raw_text, left_text, right_text, split_x).
-    Uses pdfplumber's layout=True to intelligently route text into left and right columns.
+    Uses standard extraction first, falls back to word bounding boxes if stuck words detected.
     """
-    raw_text = page.extract_text(x_tolerance=3, y_tolerance=3) or ""
+    # Primary: pdfplumber standard extraction (best for Vietnamese diacritics)
+    raw_text = page.extract_text(x_tolerance=1.5, y_tolerance=3) or ""
+    
+    # Heuristic: Detect stuck words (English CVs lacking spaces)
+    # If we see multiple unusually long alphabetic tokens, fallback to reconstruction
+    long_words = [w for w in raw_text.split() if len(w) > 25 and not w.startswith('http')]
+    if len(long_words) > 1:
+        reconstructed = _reconstruct_text_from_words(page)
+        if reconstructed:
+            raw_text = reconstructed
+    
+    # Column detection: layout=True adds positional spaces (structural analysis)
     layout_text = page.extract_text(layout=True)
     
     if not layout_text:
@@ -98,6 +172,7 @@ def _extract_text_column_aware(page) -> tuple[str, str, str, float | None]:
     return raw_text, '\n'.join(left_lines), '\n'.join(right_lines), split_indicator
 
 
+
 def _parse_pdf(file_path: str) -> dict:
     pages_data = []
     all_chars = []
@@ -132,6 +207,7 @@ def _parse_pdf(file_path: str) -> dict:
                 column_texts.append({"left": left_t, "right": None, "split_x": None})
                 
     raw_text = "\n".join([p["text"] for p in pages_data if p["text"]])
+    raw_text = _normalize_text(raw_text)
 
     return {
         "type": "pdf",

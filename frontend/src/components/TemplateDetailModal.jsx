@@ -265,65 +265,20 @@ export default function TemplateDetailModal({ template, onClose }) {
               </p>
             </div>
             <div className="flex-1 overflow-y-auto p-6 bg-neutral-900/50 flex items-start justify-center">
-              <div 
-                className="w-full bg-white shadow-xl relative flex flex-col"
-                style={{ aspectRatio: '210/297', color: '#111' }}
-              >
-                {/* Dummy Header */}
-                <div className="w-full p-4 flex gap-3 items-center" style={{ background: colors.primary || '#1e293b', color: 'white' }}>
-                  <div className="w-10 h-10 rounded-full flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)' }}></div>
-                  <div>
-                    <div className="text-[12px] font-bold uppercase tracking-widest mb-1">NGUYEN VAN A</div>
-                    <div className="text-[7px] opacity-80 font-mono tracking-wider">SENIOR SOFTWARE ENGINEER</div>
-                  </div>
+              {template.preview_html ? (
+                <div 
+                  className="w-full bg-white shadow-xl relative"
+                  style={{ color: '#111' }}
+                  dangerouslySetInnerHTML={{ __html: template.preview_html }}
+                />
+              ) : (
+                <div 
+                  className="w-full bg-white shadow-xl relative flex flex-col items-center justify-center p-10 text-center"
+                  style={{ color: '#111' }}
+                >
+                   <p className="text-gray-500 text-sm">Bản xem trước chưa sẵn sàng hoặc Template này chưa có HTML.</p>
                 </div>
-                
-                {/* Columns */}
-                <div className="flex-1 flex flex-row overflow-hidden">
-                  {/* Left Column (if exists) */}
-                  {(columns.includes('left') || columns.length === 2) && (
-                    <div className="w-1/3 h-full p-3 space-y-3 flex flex-col" style={{ background: colors.primary ? colors.primary + '10' : '#f8fafc' }}>
-                      {sections.filter(s => s.column === 'left' || (columns.length === 2 && !s.column)).map((s, i) => (
-                        <div key={i}>
-                          <div className="text-[7px] font-bold uppercase mb-1.5" style={{ color: colors.primary || '#3b82f6', letterSpacing: '0.05em' }}>
-                            {s.label || s.type}
-                          </div>
-                          <div className="space-y-1">
-                            <div className="h-1 w-full rounded" style={{ background: colors.primary ? colors.primary + '30' : '#cbd5e1' }}></div>
-                            <div className="h-1 w-5/6 rounded" style={{ background: colors.primary ? colors.primary + '30' : '#cbd5e1' }}></div>
-                            <div className="h-1 w-4/6 rounded" style={{ background: colors.primary ? colors.primary + '30' : '#cbd5e1' }}></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Right Column / Single Column */}
-                  <div className="flex-1 h-full p-4 space-y-4 flex flex-col overflow-hidden">
-                    {sections.filter(s => s.column === 'right' || s.column === 'single' || columns.length < 2).map((s, i) => (
-                      <div key={i}>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: colors.accent || colors.primary || '#3b82f6' }}></div>
-                          <div className="text-[8px] font-bold uppercase tracking-wider" style={{ color: colors.text || '#1e293b' }}>
-                            {s.label || s.type}
-                          </div>
-                        </div>
-                        {/* Dummy items */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div className="text-[6px] font-semibold" style={{ color: '#334155' }}>Senior Developer at ABC Corp</div>
-                            <div className="text-[5px] text-gray-400">2021 - Present</div>
-                          </div>
-                          <div className="space-y-0.5">
-                            <div className="h-0.5 w-full bg-gray-200 rounded"></div>
-                            <div className="h-0.5 w-11/12 bg-gray-200 rounded"></div>
-                            <div className="h-0.5 w-4/5 bg-gray-200 rounded"></div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

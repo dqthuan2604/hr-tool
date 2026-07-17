@@ -48,16 +48,11 @@ export default function FileUpload({ onUploadSuccess, isCandidate = false }) {
 
     try {
       if (isCandidate) {
-        setProgress({ status: 'processing', message: 'Đang trích xuất dữ liệu CV...' });
-        const candidate = await uploadCandidate(file);
-        setIsUploading(false);
-        setDone(true);
-        toast.success('Tải lên thành công! Dữ liệu ứng viên đã được trích xuất.');
-        if (onUploadSuccess) onUploadSuccess(candidate);
-        setTimeout(() => setDone(false), 3000);
+        const { job_id } = await uploadCandidate(file);
+        startListeningToProgress(job_id, true);
       } else {
         const { job_id } = await uploadTemplate(file);
-        startListeningToProgress(job_id);
+        startListeningToProgress(job_id, false);
       }
     } catch (err) {
       toast.error('Lỗi khi tải file. Kiểm tra kết nối backend.');
@@ -65,9 +60,13 @@ export default function FileUpload({ onUploadSuccess, isCandidate = false }) {
     }
   };
 
-  const startListeningToProgress = (jobId) => {
+  const startListeningToProgress = (jobId, isCandidateFlow) => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    const es = new EventSource(`${API_URL}/templates/upload/${jobId}/stream`);
+    const endpoint = isCandidateFlow 
+      ? `/candidates/upload/${jobId}/stream`
+      : `/templates/upload/${jobId}/stream`;
+      
+    const es = new EventSource(`${API_URL}${endpoint}`);
     eventSourceRef.current = es;
 
     es.onmessage = (event) => {
@@ -79,12 +78,12 @@ export default function FileUpload({ onUploadSuccess, isCandidate = false }) {
           es.close();
           setIsUploading(false);
           setDone(true);
-          toast.success('Template đã được phân tích thành công!');
+          toast.success(isCandidateFlow ? 'Trích xuất dữ liệu ứng viên thành công!' : 'Template đã được phân tích thành công!');
           if (onUploadSuccess) onUploadSuccess(data.payload);
           setTimeout(() => setDone(false), 3000);
         } else if (data.status === 'error') {
           es.close();
-          toast.error(data.message || 'Lỗi khi xử lý template.');
+          toast.error(data.message || (isCandidateFlow ? 'Lỗi khi trích xuất CV.' : 'Lỗi khi xử lý template.'));
           setIsUploading(false);
         }
       } catch (err) {

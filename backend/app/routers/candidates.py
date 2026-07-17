@@ -13,8 +13,13 @@ from app.services.llm_fallback import extract_full_profile_with_llm
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
-@router.post("/upload", response_model=CandidateResponse)
-async def upload_candidate(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+import json
+from sse_starlette.sse import EventSourceResponse
+from app.services.redis_pubsub import redis_client
+from app.worker import celery_app
+
+@router.post("/upload")
+async def upload_candidate(file: UploadFile = File(...)):
     if not file.filename.endswith((".pdf", ".docx")):
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
         
@@ -23,62 +28,38 @@ async def upload_candidate(file: UploadFile = File(...), db: Session = Depends(d
     if file.size and file.size > MAX_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
 
-    try:
-        # Read file
-        file_content = await file.read()
-        file_path = await run_in_threadpool(save_upload, file_content, file.filename)
+    job_id = str(uuid.uuid4())
+    file_content = await file.read()
+    
+    file_path = await run_in_threadpool(save_upload, file_content, file.filename)
+    
+    # Send task to celery
+    celery_app.send_task("app.services.tasks.process_candidate", args=[job_id, file.filename, file_path])
+    
+    return {"job_id": job_id}
+
+@router.get("/upload/{job_id}/stream")
+async def stream_progress(job_id: str):
+    async def event_generator():
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(f"job_progress_{job_id}")
         
-        # Parse file
-        parsed_data = await run_in_threadpool(parse_file, file_path)
-        
-        # --- LOG RAW TEXT FOR DEBUGGING ---
-        # print("\n" + "="*50)
-        # print(f"RAW TEXT EXTRACTED FROM {file.filename}:")
-        # print("="*50)
-        # print(parsed_data.get("raw_text", ""))
-        # print("="*50 + "\n")
-        
-        # Heuristic Extraction
-        profile_json = await run_in_threadpool(extract_candidate_profile, parsed_data)
-        
-        # AI Fallback check
-        email = profile_json.get("basic_info", {}).get("email", "")
-        work_exp = profile_json.get("work_experiences", [])
-        
-        if not email and not work_exp:
-            import os
-            disable_llm = os.getenv("DISABLE_LLM", "false").lower() == "true"
-            if not disable_llm:
-                # Try LLM fallback if heuristic failed heavily
-                llm_profile = await extract_full_profile_with_llm(parsed_data.get("raw_text", ""))
-                if llm_profile.get("basic_info", {}).get("email") or llm_profile.get("work_experiences"):
-                    profile_json = llm_profile
-                
-        # Save to DB
-        candidate = Candidate(
-            source_file=file.filename,
-            raw_text=parsed_data.get("raw_text", "")
-        )
-        db.add(candidate)
-        db.flush() # to get ID
-        
-        # Save version 1
-        version = CandidateVersion(
-            candidate_id=candidate.id,
-            version_number=1,
-            profile_json=profile_json,
-            is_current=True
-        )
-        db.add(version)
-        db.commit()
-        db.refresh(candidate)
-        
-        return candidate
-        
-    except Exception as e:
-        print(f"Error processing candidate: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            async for message in pubsub.listen():
+                if message['type'] == 'message':
+                    data_str = message['data']
+                    yield {"event": "message", "data": data_str}
+                    
+                    try:
+                        data = json.loads(data_str)
+                        if data.get("status") in ["done", "error"]:
+                            break
+                    except:
+                        pass
+        finally:
+            await pubsub.unsubscribe()
+            
+    return EventSourceResponse(event_generator())
 
 @router.get("", response_model=list[CandidateResponse])
 def list_candidates(db: Session = Depends(database.get_db)):

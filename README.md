@@ -7,6 +7,7 @@ Hệ thống Hỗ trợ Tuyển dụng & Quản lý Hồ sơ Ứng viên.
 - `backend/`: FastAPI + PostgreSQL
 - `frontend/`: React + Vite + TailwindCSS
 - `docs/`: Tài liệu (PRD, BRD)
+- docker stop $(docker ps -q)
 
 ## Cách chạy dự án (Local)
 (Đang cập nhật hướng dẫn Docker Compose...)
